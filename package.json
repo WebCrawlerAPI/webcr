@@ -1,0 +1,44 @@
+{
+  "name": "webcr",
+  "version": "0.1.0",
+  "description": "Turn websites into LLM-ready markdown from the command line with WebCrawlerAPI",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://webcrawlerapi.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/webCrawlerAPI/webcr"
+  },
+  "bugs": {
+    "url": "https://github.com/webCrawlerAPI/webcr/issues"
+  },
+  "keywords": [
+    "webcrawlerapi",
+    "web-crawling",
+    "crawling",
+    "webcrawler",
+    "webscraper",
+    "scraping",
+    "markdown",
+    "llm",
+    "rag",
+    "cli"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "webcr.js",
+    "src",
+    "README.md",
+    "LICENSE",
+    "Formula"
+  ],
+  "bin": {
+    "webcr": "./webcr.js"
+  },
+  "scripts": {
+    "check": "node --check webcr.js && node --check src/cli.js",
+    "pack": "npm pack"
+  }
+}
