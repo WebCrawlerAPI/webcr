@@ -1,5 +1,7 @@
 # webcr
 
+<video src="./webcr-demo.mov" controls playsinline muted></video>
+
 CLI tool for AI agents to get website content in Markdown. 
 
 The default `webcr <url>` flow makes a single scrape request and prints markdown to stdout. For multi-page crawling, pass `--limit` and the CLI will wait for the crawl job to complete, then download the combined markdown output.
