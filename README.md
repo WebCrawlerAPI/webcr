@@ -1,6 +1,6 @@
 # webcr
 
-<video src="./webcr-demo.mov" controls playsinline muted></video>
+![webcr demo](./webcr-demo.gif)
 
 CLI tool for AI agents to get website content in Markdown. 
 
