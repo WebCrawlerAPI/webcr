@@ -16,7 +16,7 @@ The default `webcr <url>` flow makes a single scrape request and prints markdown
 ### Homebrew
 
 ```bash
-brew tap webcrawlerapi/webcr https://github.com/WebCrawlerAPI/webcr
+brew tap webcrawlerapi/webcrawlerapi
 brew install webcr
 ```
 
@@ -26,7 +26,7 @@ brew install webcr
 curl -fsSL https://raw.githubusercontent.com/webCrawlerAPI/webcr/master/install.sh | sh
 ```
 
-Homebrew packaging files are included in [Formula/webcr.rb](./Formula/webcr.rb).
+The Homebrew formula lives at [WebCrawlerAPI/homebrew-webcrawlerapi](https://github.com/WebCrawlerAPI/homebrew-webcrawlerapi).
 
 The direct installer:
 

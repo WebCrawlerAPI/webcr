@@ -1,0 +1,64 @@
+name: homebrew-tap-update
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  update-homebrew-formula:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute source tarball sha256
+        id: release
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          URL="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${TAG}.tar.gz"
+          curl -fsSL "${URL}" -o /tmp/webcr-release.tar.gz
+          SHA256="$(sha256sum /tmp/webcr-release.tar.gz | awk '{print $1}')"
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "url=${URL}" >> "${GITHUB_OUTPUT}"
+          echo "sha256=${SHA256}" >> "${GITHUB_OUTPUT}"
+
+      - name: Checkout tap repo
+        run: |
+          set -euo pipefail
+          git clone --branch master "https://github.com/WebCrawlerAPI/homebrew-webcrawlerapi.git" /tmp/webcr-tap
+
+      - name: Update formula
+        run: |
+          set -euo pipefail
+          chmod +x tools/webcr/scripts/update-homebrew-formula.sh
+          tools/webcr/scripts/update-homebrew-formula.sh \
+            "${{ steps.release.outputs.tag }}" \
+            "${{ steps.release.outputs.sha256 }}" \
+            /tmp/webcr-tap
+
+      - name: Commit and push
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd /tmp/webcr-tap
+          git config user.name "webcrawlerapi-bot"
+          git config user.email "sdk@webcrawlerapi.com"
+          git remote set-url origin "https://x-access-token:${TAP_TOKEN}@github.com/WebCrawlerAPI/homebrew-webcrawlerapi.git"
+
+          if git diff --quiet; then
+            echo "No formula changes to commit"
+            exit 0
+          fi
+
+          git add Formula/webcr.rb
+          git commit -m "brew(webcr): update to ${{ steps.release.outputs.tag }}"
+          git push origin HEAD:master
