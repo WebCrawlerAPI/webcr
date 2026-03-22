@@ -1,5 +1,5 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { homedir, platform } from "node:os";
 import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
@@ -33,7 +33,7 @@ export async function runCli(argv) {
     const baseUrl = args.options["base-url"] || DEFAULT_BASE_URL;
 
     if (args.options.limit != null) {
-      const markdown = await crawlToMarkdown({
+      const crawlParams = {
         apiKey,
         baseUrl,
         url,
@@ -42,7 +42,22 @@ export async function runCli(argv) {
         whitelistRegexp: args.options.whitelist_regexp,
         blacklistRegexp: args.options.blacklist_regexp,
         mainContentOnly: args.options["main-content-only"] === true
-      });
+      };
+
+      if (args.options.output != null) {
+        const count = await crawlToFiles({ ...crawlParams, outputDir: args.options.output });
+        process.stderr.write(`Saved ${count} file(s) to ${args.options.output}\n`);
+        return;
+      }
+
+      if (args.options["output-single"] != null) {
+        const markdown = await crawlToMarkdown(crawlParams);
+        writeFileSync(resolve(args.options["output-single"]), markdown);
+        process.stderr.write(`Saved to ${args.options["output-single"]}\n`);
+        return;
+      }
+
+      const markdown = await crawlToMarkdown(crawlParams);
       process.stdout.write(markdown);
       if (!markdown.endsWith("\n")) {
         process.stdout.write("\n");
@@ -163,7 +178,11 @@ async function crawlToMarkdown({
     throw new CliError("Crawl request did not return a job id.");
   }
 
-  const job = await waitForJob(baseUrl, apiKey, created.id);
+  const progress = new ProgressBar();
+  const job = await waitForJob(baseUrl, apiKey, created.id, (done, total, phase) => {
+    progress.render(done, total, phase);
+  });
+  progress.clear();
   if (job.status !== "done") {
     throw new CliError(`Crawl finished with status ${job.status}.`);
   }
@@ -180,7 +199,123 @@ async function crawlToMarkdown({
   return response.text();
 }
 
-async function waitForJob(baseUrl, apiKey, jobId) {
+async function crawlToFiles({
+  apiKey,
+  baseUrl,
+  url,
+  limit,
+  maxDepth,
+  whitelistRegexp,
+  blacklistRegexp,
+  mainContentOnly,
+  outputDir
+}) {
+  const created = await fetchJson(`${baseUrl}/v1/crawl`, {
+    method: "POST",
+    headers: makeHeaders(apiKey),
+    body: JSON.stringify({
+      url,
+      items_limit: limit,
+      scrape_type: "markdown",
+      max_depth: maxDepth,
+      whitelist_regexp: whitelistRegexp,
+      blacklist_regexp: blacklistRegexp,
+      main_content_only: mainContentOnly
+    })
+  });
+
+  if (!created || typeof created.id !== "string" || created.id.length === 0) {
+    throw new CliError("Crawl request did not return a job id.");
+  }
+
+  const progress = new ProgressBar();
+  const job = await waitForJob(baseUrl, apiKey, created.id, (done, total, phase) => {
+    progress.render(done, total, phase);
+  });
+  if (job.status !== "done") {
+    progress.clear();
+    throw new CliError(`Crawl finished with status ${job.status}.`);
+  }
+
+  const dir = resolve(outputDir);
+  mkdirSync(dir, { recursive: true });
+
+  const items = Array.isArray(job.job_items) ? job.job_items : [];
+  const doneItems = items.filter((i) => i.status === "done" && i.markdown_content_url);
+  const total = doneItems.length;
+  let saved = 0;
+
+  for (const item of doneItems) {
+    const content = await fetchItemContent(item.markdown_content_url);
+    if (content === null) {
+      continue;
+    }
+
+    const filename = urlToFilename(item.original_url || item.markdown_content_url);
+    writeFileSync(join(dir, filename), content);
+    saved += 1;
+    progress.render(saved, total, "saving");
+  }
+
+  progress.clear();
+  return saved;
+}
+
+async function fetchItemContent(contentUrl) {
+  const response = await fetch(contentUrl, {
+    headers: {
+      "Accept-Encoding": "gzip, deflate, br",
+      "Accept": "*/*"
+    }
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return response.text();
+}
+
+function urlToFilename(rawUrl) {
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    // Not a valid URL, sanitize as-is
+    return rawUrl.replace(/[^\w.-]/g, "_") + ".md";
+  }
+
+  const host = parsed.hostname.replace(/^www\./, "");
+  const path = parsed.pathname.replace(/\/+$/, ""); // strip trailing slashes
+  const combined = path.length > 0 ? `${host}${path}` : host;
+  const filename = combined.replace(/[^\w.-]/g, "_");
+  return `${filename}.md`;
+}
+
+class ProgressBar {
+  constructor() {
+    this._active = false;
+  }
+
+  render(done, total, phase) {
+    const width = 24;
+    const label = phase === "saving" ? "Saving  " : "Crawling";
+    const filled = total > 0 ? Math.round((done / total) * width) : 0;
+    const bar = "█".repeat(filled) + "░".repeat(width - filled);
+    const count = total > 0 ? `${done}/${total}` : `${done}/?`;
+    process.stderr.write(`\r${label} [${bar}] ${count} pages`);
+    this._active = true;
+  }
+
+  clear() {
+    if (this._active) {
+      process.stderr.write("\r\x1b[K");
+      this._active = false;
+    }
+  }
+}
+
+async function waitForJob(baseUrl, apiKey, jobId, onProgress) {
   let delayMs = 1500;
 
   for (let attempt = 0; attempt < 120; attempt += 1) {
@@ -189,6 +324,12 @@ async function waitForJob(baseUrl, apiKey, jobId) {
       method: "GET",
       headers: makeHeaders(apiKey)
     });
+
+    if (onProgress && Array.isArray(job.job_items)) {
+      const total = job.job_items.length;
+      const done = job.job_items.filter((i) => i.status === "done").length;
+      onProgress(done, total, "crawling");
+    }
 
     if (job.status !== "new" && job.status !== "in_progress") {
       return job;
@@ -455,6 +596,16 @@ function parseArgs(argv) {
       continue;
     }
 
+    if (arg === "-o" || arg === "--output") {
+      options.output = requireValue(argv[++index], arg);
+      continue;
+    }
+
+    if (arg === "-os" || arg === "--output-single") {
+      options["output-single"] = requireValue(argv[++index], arg);
+      continue;
+    }
+
     throw new CliError(`Unknown flag: ${arg}`);
   }
 
@@ -513,6 +664,8 @@ Options:
   -w, --whitelist_regexp <pat>   Crawl whitelist_regexp
   -b, --blacklist_regexp <pat>   Crawl blacklist_regexp
   -m, --main-content-only        Set main_content_only=true
+  -o, --output <path>            Save each crawled page as <url>.md in this directory (requires --limit)
+  -os, --output-single <file>    Save combined crawl markdown to a single file (requires --limit)
   -u, --base-url <url>           Override API base URL
   -h, --help                     Show help
 
@@ -525,6 +678,7 @@ Examples:
   webcr https://example.com
   webcr https://example.com -m
   webcr https://docs.example.com -l 20 -d 2 -w '/docs'
+  webcr https://docs.example.com -l 20 -o ./pages
 `);
 }
 

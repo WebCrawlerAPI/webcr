@@ -6,10 +6,23 @@ CLI tool for AI agents to get website content in Markdown.
 
 The default `webcr <url>` flow makes a single scrape request and prints markdown to stdout. For multi-page crawling, pass `--limit` and the CLI will wait for the crawl job to complete, then download the combined markdown output.
 
-## Behavior
+```
+Options:
+  -l, --limit <n>                Crawl with items_limit=<n>
+  -d, --depth <n>                Alias for --max-depth
+  --max-depth <n>                Crawl max_depth
+  -w, --whitelist_regexp <pat>   Crawl whitelist_regexp
+  -b, --blacklist_regexp <pat>   Crawl blacklist_regexp
+  -m, --main-content-only        Set main_content_only=true
+  -o, --output <path>            Save each crawled page as <url>.md in this directory (requires --limit)
+  -os, --output-single <file>    Save combined crawl markdown to a single file (requires --limit)
+  -u, --base-url <url>           Override API base URL
+  -h, --help                     Show help
+```
 
 - `webcr <url>` calls `POST /v2/scrape` with `output_format: "markdown"` and prints markdown to stdout.
 - `webcr <url> --limit 10` calls `POST /v1/crawl`, waits for the job to finish, then downloads combined markdown from `GET /v1/job/:id/markdown/content`.
+- `webcr <url> --limit 10 --output <path>` saves each crawled page as a separate `.md` file in the given directory, named after its URL.
 
 ## Install
 
@@ -55,20 +68,6 @@ webcr auth status
 webcr auth clear
 ```
 
-Credential lookup order:
-
-1. `WEBCRAWLER_API_KEY`
-2. Stored secret
-3. Plain config fallback at `~/.config/webcr/config.json`
-
-If no key is configured and you run `webcr <url>` interactively, the CLI will prompt you and tell you to get the key from `https://dash.webcrawlerapi.com/access`.
-
-Storage backends:
-
-- macOS: Keychain via `security`
-- Linux: Secret Service via `secret-tool` when available
-- Fallback: `0600` config file in XDG config dir
-
 ## Examples
 
 ```bash
@@ -76,4 +75,14 @@ webcr https://example.com
 webcr https://example.com -m
 webcr https://docs.example.com -l 25 -d 2
 webcr https://docs.example.com -l 25 -w '/docs' -b '/blog'
+webcr https://docs.example.com -l 25 -o ./pages
+webcr https://docs.example.com -l 25 -os ./docs.md
 ```
+
+## Output to files (`--output`)
+
+`-o/--output <path>` requires `--limit` and saves each successfully crawled page as an individual markdown file instead of printing combined output to stdout.
+
+Files are named after the page URL: protocol and `www.` are stripped, path separators and special characters are replaced with `_`. For example, `https://docs.example.com/api/intro` becomes `docs.example.com_api_intro.md`.
+
+A progress bar is shown on stderr during crawling and file saving.
