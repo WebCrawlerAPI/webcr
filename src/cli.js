@@ -88,6 +88,21 @@ export async function runCli(argv) {
 }
 
 async function runUpdateCommand() {
+  // Detect install.sh install: ~/.local/share/webcr/current exists
+  const installShDir = join(homedir(), ".local", "share", "webcr", "current");
+  if (existsSync(installShDir)) {
+    process.stderr.write("Updating webcr via install script...\n");
+    const result = spawnSync(
+      "sh",
+      ["-c", "curl -fsSL https://raw.githubusercontent.com/webCrawlerAPI/webcr/master/install.sh | sh"],
+      { encoding: "utf8", stdio: "inherit" }
+    );
+    if (result.status !== 0) {
+      throw new CliError("Install script update failed.");
+    }
+    return;
+  }
+
   // Detect Homebrew install: check if brew knows about webcr
   const brewCheck = spawnSync("brew", ["list", "--formula", "webcr"], { encoding: "utf8" });
   if (brewCheck.status === 0) {
