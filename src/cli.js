@@ -24,6 +24,11 @@ export async function runCli(argv) {
       return;
     }
 
+    if (args.command === "update") {
+      await runUpdateCommand();
+      return;
+    }
+
     const url = args.positionals[0];
     if (!url) {
       throw new CliError("A URL is required.");
@@ -79,6 +84,26 @@ export async function runCli(argv) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`${message}\n`);
     process.exitCode = 1;
+  }
+}
+
+async function runUpdateCommand() {
+  // Detect Homebrew install: check if brew knows about webcr
+  const brewCheck = spawnSync("brew", ["list", "--formula", "webcr"], { encoding: "utf8" });
+  if (brewCheck.status === 0) {
+    process.stderr.write("Updating webcr via Homebrew...\n");
+    const result = spawnSync("brew", ["upgrade", "webcr"], { encoding: "utf8", stdio: "inherit" });
+    if (result.status !== 0) {
+      throw new CliError("Homebrew upgrade failed.");
+    }
+    return;
+  }
+
+  // Fall back to npm global update
+  process.stderr.write("Updating webcr via npm...\n");
+  const result = spawnSync("npm", ["install", "-g", "webcr@latest"], { encoding: "utf8", stdio: "inherit" });
+  if (result.status !== 0) {
+    throw new CliError("npm update failed.");
   }
 }
 
@@ -609,10 +634,19 @@ function parseArgs(argv) {
     throw new CliError(`Unknown flag: ${arg}`);
   }
 
+  const firstPositional = positionals[0];
+  let command = "run";
+  let remainingPositionals = positionals;
+
+  if (firstPositional === "auth" || firstPositional === "update") {
+    command = firstPositional;
+    remainingPositionals = positionals.slice(1);
+  }
+
   return {
-    command: positionals[0] === "auth" ? "auth" : "run",
+    command,
     help: options.help === true,
-    positionals: positionals[0] === "auth" ? positionals.slice(1) : positionals,
+    positionals: remainingPositionals,
     options
   };
 }
@@ -673,6 +707,9 @@ Auth:
   webcr auth set <api_key>
   webcr auth status
   webcr auth clear
+
+Update:
+  webcr update                   Update webcr to the latest version (Homebrew or npm)
 
 Examples:
   webcr https://example.com
