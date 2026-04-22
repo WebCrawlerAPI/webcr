@@ -38,8 +38,8 @@ jobs:
       - name: Update formula
         run: |
           set -euo pipefail
-          chmod +x tools/webcr/scripts/update-homebrew-formula.sh
-          tools/webcr/scripts/update-homebrew-formula.sh \
+          chmod +x scripts/update-homebrew-formula.sh
+          scripts/update-homebrew-formula.sh \
             "${{ steps.release.outputs.tag }}" \
             "${{ steps.release.outputs.sha256 }}" \
             /tmp/webcr-tap
