@@ -9,6 +9,7 @@ class Webcr < Formula
 
   def install
     libexec.install "webcr.js", "src", "README.md", "LICENSE", "package.json"
+    (libexec/"webcr.js").chmod 0555
 
     (bin/"webcr").write_env_script libexec/"webcr.js", PATH: ENV["PATH"]
   end
