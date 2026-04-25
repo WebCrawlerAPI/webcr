@@ -1,6 +1,6 @@
 {
   "name": "webcr",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Turn websites into LLM-ready markdown from the command line with WebCrawlerAPI",
   "type": "module",
   "license": "MIT",

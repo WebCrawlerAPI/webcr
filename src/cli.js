@@ -46,7 +46,8 @@ export async function runCli(argv) {
         maxDepth: args.options["max-depth"],
         whitelistRegexp: args.options.whitelist_regexp,
         blacklistRegexp: args.options.blacklist_regexp,
-        mainContentOnly: args.options["main-content-only"] === true
+        mainContentOnly: args.options["main-content-only"] === true,
+        maxAge: args.options["max-age"]
       };
 
       if (args.options.output != null) {
@@ -74,7 +75,8 @@ export async function runCli(argv) {
       apiKey,
       baseUrl,
       url,
-      mainContentOnly: args.options["main-content-only"] === true
+      mainContentOnly: args.options["main-content-only"] === true,
+      maxAge: args.options["max-age"]
     });
     process.stdout.write(markdown);
     if (!markdown.endsWith("\n")) {
@@ -168,14 +170,15 @@ async function runAuthCommand(positionals, options) {
   throw new CliError(`Unknown auth command: ${subcommand}`);
 }
 
-async function scrapeToMarkdown({ apiKey, baseUrl, url, mainContentOnly }) {
+async function scrapeToMarkdown({ apiKey, baseUrl, url, mainContentOnly, maxAge }) {
   const response = await fetchJson(`${baseUrl}/v2/scrape`, {
     method: "POST",
     headers: makeHeaders(apiKey),
     body: JSON.stringify({
       url,
       output_format: "markdown",
-      main_content_only: mainContentOnly
+      main_content_only: mainContentOnly,
+      max_age: maxAge
     })
   });
 
@@ -198,7 +201,8 @@ async function crawlToMarkdown({
   maxDepth,
   whitelistRegexp,
   blacklistRegexp,
-  mainContentOnly
+  mainContentOnly,
+  maxAge
 }) {
   const created = await fetchJson(`${baseUrl}/v1/crawl`, {
     method: "POST",
@@ -210,7 +214,8 @@ async function crawlToMarkdown({
       max_depth: maxDepth,
       whitelist_regexp: whitelistRegexp,
       blacklist_regexp: blacklistRegexp,
-      main_content_only: mainContentOnly
+      main_content_only: mainContentOnly,
+      max_age: maxAge
     })
   });
 
@@ -248,6 +253,7 @@ async function crawlToFiles({
   whitelistRegexp,
   blacklistRegexp,
   mainContentOnly,
+  maxAge,
   outputDir
 }) {
   const created = await fetchJson(`${baseUrl}/v1/crawl`, {
@@ -260,7 +266,8 @@ async function crawlToFiles({
       max_depth: maxDepth,
       whitelist_regexp: whitelistRegexp,
       blacklist_regexp: blacklistRegexp,
-      main_content_only: mainContentOnly
+      main_content_only: mainContentOnly,
+      max_age: maxAge
     })
   });
 
@@ -631,6 +638,11 @@ function parseArgs(argv) {
       continue;
     }
 
+    if (arg === "--max-age") {
+      options["max-age"] = parseInteger(argv[++index], arg);
+      continue;
+    }
+
     if (arg === "-u" || arg === "--base-url") {
       options["base-url"] = requireValue(argv[++index], arg);
       continue;
@@ -713,6 +725,7 @@ Options:
   -w, --whitelist_regexp <pat>   Crawl whitelist_regexp
   -b, --blacklist_regexp <pat>   Crawl blacklist_regexp
   -m, --main-content-only        Set main_content_only=true
+  --max-age <ms>                 Set max_age (milliseconds) for cached results
   -o, --output <path>            Save each crawled page as <url>.md in this directory (requires --limit)
   -os, --output-single <file>    Save combined crawl markdown to a single file (requires --limit)
   -u, --base-url <url>           Override API base URL
