@@ -1,11 +1,15 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { homedir, platform } from "node:os";
 import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 
 const DEFAULT_BASE_URL = "https://api.webcrawlerapi.com";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const { version: CURRENT_VERSION } = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf8"));
 const SERVICE_NAME = "webcrawlerapi.com";
 const ACCOUNT_NAME = "webcr";
 const ENV_API_KEY = "WEBCRAWLER_API_KEY";
@@ -90,6 +94,8 @@ export async function runCli(argv) {
 }
 
 async function runUpdateCommand() {
+  process.stderr.write(`Current version: v${CURRENT_VERSION}\n`);
+
   // Detect install.sh install: ~/.local/share/webcr/current exists
   const installShDir = join(homedir(), ".local", "share", "webcr", "current");
   if (existsSync(installShDir)) {
