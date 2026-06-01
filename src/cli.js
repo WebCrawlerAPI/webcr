@@ -473,14 +473,14 @@ function getStoredApiKey() {
     }
   }
 
-  if (system === "linux") {
+  if (system === "linux" && spawnSync("which", ["secret-tool"], { encoding: "utf8" }).status === 0) {
     const secretTool = spawnSync("secret-tool", [
       "lookup",
       "service",
       SERVICE_NAME,
       "account",
       ACCOUNT_NAME
-    ], { encoding: "utf8" });
+    ], { encoding: "utf8", timeout: 5000 });
 
     if (secretTool.status === 0) {
       return secretTool.stdout.trim();
@@ -513,14 +513,14 @@ function storeApiKey(apiKey) {
       ACCOUNT_NAME,
       "-w",
       apiKey
-    ], { encoding: "utf8" });
+    ], { encoding: "utf8", timeout: 5000 });
 
     if (result.status === 0) {
       return;
     }
   }
 
-  if (system === "linux") {
+  if (system === "linux" && spawnSync("which", ["secret-tool"], { encoding: "utf8" }).status === 0) {
     const result = spawnSync(
       "sh",
       [
@@ -529,6 +529,7 @@ function storeApiKey(apiKey) {
       ],
       {
         encoding: "utf8",
+        timeout: 5000,
         env: { ...process.env, WEBCR_INPUT_KEY: apiKey }
       }
     );
